@@ -136,13 +136,3 @@ spec:
               name: emby-service
               port:
                 number: 8096
-    - host: emby
-      http:
-        paths:
-        - pathType: Prefix
-          path: /
-          backend:
-            service:
-              name: emby-service
-              port:
-                number: 8096                
