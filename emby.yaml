@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embymedia
+  labels:
+    name: embymedia
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: embyconfig
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: /storage/k8sConfig/emby
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: embymedia
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 100Gi
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: /storage/k8sStorage/emby
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-config-claim
+  namespace: embymedia
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  volumeName: embyconfig
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-media-claim
+  namespace: embymedia
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  volumeName: embymedia
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emby
+  namespace: embymedia
+spec:
+  template:
+    metadata:
+      name: emby-app
+      labels: 
+        name: emby-app
+    spec:
+      volumes:
+        - name: emedia
+          persistentVolumeClaim:
+            claimName: emby-media-claim
+        - name: econfig
+          persistentVolumeClaim:
+            claimName: emby-config-claim
+      containers:
+      - name: emby
+        image: emby/embyserver
+        env:
+        - name: UID
+          value: "1000"
+        - name: GID
+          value: "1000"
+        volumeMounts:
+        - name: econfig
+          mountPath: "/config/"
+        - name: emedia
+          mountPath: "/media/"
+        imagePullPolicy: IfNotPresent
+  replicas: 1 
+  selector:
+    matchLabels:
+      name: emby-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emby-service
+  namespace: embymedia
+spec:
+  selector:
+    name: emby-app
+  ports: 
+  - name: emby-web
+    protocol: TCP
+    port: 8096
+    targetPort: 8096
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: emby-web-ingress
+  namespace: embymedia
+spec:
+  rules:
+  - host: m.dfv24.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: emby-service
+            port:
+              number: 8096
+  - host: emby  
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: emby-service
+            port:
+              number: 8096
